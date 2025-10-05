@@ -13,6 +13,10 @@ urlpatterns = [
     # Prediction endpoints
     path('predict/single/', views.predict_single, name='predict-single'),
     
+    # Helper endpoints
+    path('search-kepid/', views.search_by_kepid, name='search-kepid'),
+    path('get-example/', views.get_example_data, name='get-example'),
+    
     # Light curve visualization
     path('lightcurve/visualize/', views.visualize_lightcurve, name='visualize-lightcurve'),
     path('lightcurve/phase-fold/', views.phase_fold, name='phase-fold'),

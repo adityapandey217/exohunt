@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FiHome, FiBarChart2, FiUpload } from 'react-icons/fi';
+import { FiHome, FiBarChart2, FiUpload, FiActivity } from 'react-icons/fi';
 
 function Navbar() {
   return (
@@ -36,6 +36,13 @@ function Navbar() {
             >
               <FiUpload className="text-xl" />
               <span className="font-medium">Analyze</span>
+            </Link>
+            <Link
+              to="/visualize"
+              className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors duration-200"
+            >
+              <FiActivity className="text-xl" />
+              <span className="font-medium">Visualize</span>
             </Link>
           </div>
         </div>

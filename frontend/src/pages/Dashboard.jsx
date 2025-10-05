@@ -71,10 +71,12 @@ function Dashboard() {
                 <span className="text-sm opacity-90">Confirmed</span>
                 <FiCheckCircle className="text-2xl" />
               </div>
-              <div className="text-3xl font-bold">{stats.confirmed_count}</div>
+              <div className="text-3xl font-bold">
+                {stats.class_distribution?.CONFIRMED || stats.class_distribution?.['2'] || 0}
+              </div>
               <div className="text-sm opacity-90 mt-1">
                 {stats.total_predictions > 0
-                  ? ((stats.confirmed_count / stats.total_predictions) * 100).toFixed(1)
+                  ? (((stats.class_distribution?.CONFIRMED || stats.class_distribution?.['2'] || 0) / stats.total_predictions) * 100).toFixed(1)
                   : 0}
                 %
               </div>
@@ -85,10 +87,12 @@ function Dashboard() {
                 <span className="text-sm opacity-90">Candidates</span>
                 <FiAlertCircle className="text-2xl" />
               </div>
-              <div className="text-3xl font-bold">{stats.candidate_count}</div>
+              <div className="text-3xl font-bold">
+                {stats.class_distribution?.CANDIDATE || stats.class_distribution?.['1'] || 0}
+              </div>
               <div className="text-sm opacity-90 mt-1">
                 {stats.total_predictions > 0
-                  ? ((stats.candidate_count / stats.total_predictions) * 100).toFixed(1)
+                  ? (((stats.class_distribution?.CANDIDATE || stats.class_distribution?.['1'] || 0) / stats.total_predictions) * 100).toFixed(1)
                   : 0}
                 %
               </div>
@@ -99,10 +103,12 @@ function Dashboard() {
                 <span className="text-sm opacity-90">False Positives</span>
                 <FiXCircle className="text-2xl" />
               </div>
-              <div className="text-3xl font-bold">{stats.false_positive_count}</div>
+              <div className="text-3xl font-bold">
+                {stats.class_distribution?.['FALSE POSITIVE'] || stats.class_distribution?.['0'] || 0}
+              </div>
               <div className="text-sm opacity-90 mt-1">
                 {stats.total_predictions > 0
-                  ? ((stats.false_positive_count / stats.total_predictions) * 100).toFixed(1)
+                  ? (((stats.class_distribution?.['FALSE POSITIVE'] || stats.class_distribution?.['0'] || 0) / stats.total_predictions) * 100).toFixed(1)
                   : 0}
                 %
               </div>
@@ -113,28 +119,28 @@ function Dashboard() {
         {/* Recent Predictions Table */}
         <div className="card">
           <h2 className="text-2xl font-bold mb-6 text-gray-800">Recent Predictions</h2>
-          {recentPredictions.length > 0 ? (
+          {recentPredictions && recentPredictions.results && recentPredictions.results.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">KIC ID</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">KepID</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Disposition</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Confidence</th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Time</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Processing Time</th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentPredictions.map((pred) => (
+                  {recentPredictions.results.map((pred) => (
                     <tr key={pred.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors duration-150">
                       <td className="py-3 px-4 font-mono text-sm">
-                        {pred.lightcurve?.kic_id || 'N/A'}
+                        {pred.light_curve_details?.kepid || 'N/A'}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center space-x-2">
-                          {getDispositionIcon(pred.predicted_disposition)}
-                          <span className="font-medium">{pred.predicted_disposition}</span>
+                          {getDispositionIcon(pred.predicted_class_name)}
+                          <span className="font-medium">{pred.predicted_class_name}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4">
@@ -151,10 +157,10 @@ function Dashboard() {
                         </div>
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
-                        {pred.inference_time.toFixed(3)}s
+                        {pred.processing_time_ms}ms
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-600">
-                        {new Date(pred.timestamp).toLocaleDateString()}
+                        {new Date(pred.created_at).toLocaleDateString()}
                       </td>
                     </tr>
                   ))}

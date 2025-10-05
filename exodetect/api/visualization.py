@@ -7,6 +7,7 @@ from typing import Dict, List, Tuple, Optional
 from scipy import signal
 from scipy.stats import median_abs_deviation
 import plotly.graph_objects as go
+from .flux_utils import get_flux_from_lc, get_time_from_lc
 
 
 def create_interactive_plot(
@@ -14,9 +15,9 @@ def create_interactive_plot(
     flux_array: Optional[np.ndarray] = None,
     highlighted_regions: Optional[List[Tuple[float, float]]] = None,
     title: Optional[str] = None
-) -> Dict:
+) -> str:
     """
-    Create interactive Plotly visualization data for a light curve
+    Create interactive Plotly visualization as HTML string for a light curve
     
     Args:
         fits_path: Path to FITS file
@@ -25,44 +26,86 @@ def create_interactive_plot(
         title: Optional plot title
         
     Returns:
-        Dictionary with plotly JSON data
+        HTML string with embedded Plotly plot
     """
     # Load light curve
     lc = lk.read(fits_path)
     
-    # Get time and flux
-    if hasattr(lc, 'time'):
-        time = lc.time.value
-    else:
-        time = np.arange(len(lc.flux))
+    # Get time and flux using helper functions
+    time = get_time_from_lc(lc)
     
     if flux_array is not None:
         flux = flux_array
     else:
-        if hasattr(lc, "PDCSAP_FLUX") and lc.PDCSAP_FLUX is not None:
-            flux = lc.PDCSAP_FLUX.value
-        elif hasattr(lc, "SAP_FLUX") and lc.SAP_FLUX is not None:
-            flux = lc.SAP_FLUX.value
-        else:
-            flux = lc.flux.value
+        flux = get_flux_from_lc(lc)
     
     # Remove NaNs for plotting
     valid_mask = ~np.isnan(flux)
     time = time[valid_mask]
     flux = flux[valid_mask]
     
-    # Create main trace
-    data = {
-        'time': time.tolist(),
-        'flux': flux.tolist(),
-        'title': title or f"Light Curve",
-    }
+    # Convert to native endianness for Plotly/kaleido compatibility
+    time = np.asarray(time, dtype=np.float64)
+    flux = np.asarray(flux, dtype=np.float64)
+    
+    # Create Plotly figure
+    fig = go.Figure()
+    
+    # Add main light curve trace
+    fig.add_trace(go.Scattergl(
+        x=time,
+        y=flux,
+        mode='markers',
+        marker=dict(
+            size=2,
+            color='rgba(59, 130, 246, 0.6)',
+            line=dict(width=0)
+        ),
+        name='Flux',
+        hovertemplate='Time: %{x:.2f}<br>Flux: %{y:.6f}<extra></extra>'
+    ))
     
     # Add highlighted regions if provided
     if highlighted_regions:
-        data['highlighted_regions'] = highlighted_regions
+        for i, (start, end) in enumerate(highlighted_regions):
+            fig.add_vrect(
+                x0=start, x1=end,
+                fillcolor="red", opacity=0.2,
+                layer="below", line_width=0,
+                annotation_text=f"Transit {i+1}",
+                annotation_position="top left"
+            )
     
-    return data
+    # Update layout
+    fig.update_layout(
+        title=dict(
+            text=title or 'Light Curve',
+            font=dict(size=20, color='#1f2937')
+        ),
+        xaxis=dict(
+            title='Time (BKJD - days)',
+            gridcolor='#e5e7eb',
+            showgrid=True,
+            zeroline=False
+        ),
+        yaxis=dict(
+            title='Normalized Flux',
+            gridcolor='#e5e7eb',
+            showgrid=True,
+            zeroline=False
+        ),
+        plot_bgcolor='#f9fafb',
+        paper_bgcolor='#ffffff',
+        hovermode='closest',
+        showlegend=False,
+        height=500,
+        width=1200,
+        margin=dict(l=60, r=30, t=60, b=60)
+    )
+    
+    # Return as PNG image bytes
+    img_bytes = fig.to_image(format='png', width=1200, height=500, scale=2)
+    return img_bytes
 
 
 def detect_transits(
@@ -92,8 +135,8 @@ def detect_transits(
         # Run BLS periodogram
         from astropy.timeseries import BoxLeastSquares
         
-        time = lc_flat.time.value
-        flux = lc_flat.flux.value
+        time = get_time_from_lc(lc_flat)
+        flux = get_flux_from_lc(lc_flat)
         
         # Remove NaNs
         valid = ~np.isnan(flux)
@@ -156,14 +199,8 @@ def phase_fold_light_curve(
     """
     lc = lk.read(fits_path)
     
-    time = lc.time.value
-    
-    if hasattr(lc, "PDCSAP_FLUX") and lc.PDCSAP_FLUX is not None:
-        flux = lc.PDCSAP_FLUX.value
-    elif hasattr(lc, "SAP_FLUX") and lc.SAP_FLUX is not None:
-        flux = lc.SAP_FLUX.value
-    else:
-        flux = lc.flux.value
+    time = get_time_from_lc(lc)
+    flux = get_flux_from_lc(lc)
     
     # Remove NaNs
     valid = ~np.isnan(flux)
@@ -201,13 +238,8 @@ def calculate_periodogram(fits_path: str) -> Dict:
     """
     lc = lk.read(fits_path)
     
-    time = lc.time.value
-    if hasattr(lc, "PDCSAP_FLUX") and lc.PDCSAP_FLUX is not None:
-        flux = lc.PDCSAP_FLUX.value
-    elif hasattr(lc, "SAP_FLUX") and lc.SAP_FLUX is not None:
-        flux = lc.SAP_FLUX.value
-    else:
-        flux = lc.flux.value
+    time = get_time_from_lc(lc)
+    flux = get_flux_from_lc(lc)
     
     # Remove NaNs and normalize
     valid = ~np.isnan(flux)
@@ -254,11 +286,8 @@ def detect_anomalies(
     """
     lc = lk.read(fits_path)
     
-    time = lc.time.value
-    if hasattr(lc, "PDCSAP_FLUX") and lc.PDCSAP_FLUX is not None:
-        flux = lc.PDCSAP_FLUX.value
-    else:
-        flux = lc.SAP_FLUX.value if hasattr(lc, "SAP_FLUX") else lc.flux.value
+    time = get_time_from_lc(lc)
+    flux = get_flux_from_lc(lc)
     
     # Remove NaNs
     valid = ~np.isnan(flux)
@@ -307,14 +336,8 @@ def compare_light_curves(fits_paths: List[str], labels: Optional[List[str]] = No
     for fits_path, label in zip(fits_paths, labels):
         try:
             lc = lk.read(fits_path)
-            time = lc.time.value
-            
-            if hasattr(lc, "PDCSAP_FLUX") and lc.PDCSAP_FLUX is not None:
-                flux = lc.PDCSAP_FLUX.value
-            elif hasattr(lc, "SAP_FLUX") and lc.SAP_FLUX is not None:
-                flux = lc.SAP_FLUX.value
-            else:
-                flux = lc.flux.value
+            time = get_time_from_lc(lc)
+            flux = get_flux_from_lc(lc)
             
             # Remove NaNs
             valid = ~np.isnan(flux)

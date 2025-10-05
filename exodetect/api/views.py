@@ -17,6 +17,74 @@ import uuid
 import tempfile
 from pathlib import Path
 from typing import Dict, List
+import pandas as pd
+import lightkurve as lk
+from astropy.io import fits as astropy_fits
+import requests
+
+from .cache_utils import get_cached_fits, save_to_cache
+
+
+def fast_download_lightcurve(kepid: int) -> str:
+    """
+    Fast light curve download with caching and local file support.
+    Priority: local example_lightcurves > local lightcurves > cache > lightkurve download
+    
+    Args:
+        kepid: Kepler ID
+        
+    Returns:
+        Path to FITS file
+    """
+    # Check example_lightcurves directory first (for curated examples, deployment-ready)
+    example_lightcurves_dir = os.path.join(settings.BASE_DIR, 'example_lightcurves')
+    local_fits = os.path.join(example_lightcurves_dir, f'{kepid}.fits')
+    if os.path.exists(local_fits):
+        print(f"✅ Using example FITS file for KepID {kepid}")
+        return local_fits
+    
+    # Check parent lightcurves directory (for development)
+    lightcurves_dir = os.path.join(settings.BASE_DIR, '..', 'lightcurves')
+    local_fits = os.path.join(lightcurves_dir, f'{kepid}.fits')
+    if os.path.exists(local_fits):
+        print(f"✅ Using local FITS file for KepID {kepid}")
+        return local_fits
+    
+    # Check cache second
+    cached_path = get_cached_fits(kepid)
+    if cached_path and os.path.exists(cached_path):
+        print(f"✅ Using cached FITS for KepID {kepid}")
+        return cached_path
+    
+    print(f"⬇️ Downloading FITS for KepID {kepid}...")
+    
+    # Use lightkurve but with quick download
+    try:
+        # Quick search with minimal timeout
+        search_result = lk.search_lightcurve(f'KIC {kepid}', mission='Kepler')
+        
+        if len(search_result) == 0:
+            raise ValueError(f'No light curves found for KepID {kepid}')
+        
+        # Download ONLY first quarter (fast!)
+        lc = search_result[0].download()
+        
+        # Save to cache
+        temp_path = os.path.join(tempfile.gettempdir(), f"lc_{kepid}_{uuid.uuid4()}.fits")
+        lc.to_fits(temp_path, overwrite=True)
+        
+        # Copy to cache for future use
+        cached_path = save_to_cache(kepid, temp_path)
+        
+        print(f"✅ Downloaded and cached KepID {kepid}")
+        return cached_path
+        
+    except Exception as e:
+        raise Exception(f"Failed to download light curve for KepID {kepid}: {str(e)}")
+
+
+
+
 
 from .models import (
     LightCurveFile, KOIParameters, Prediction, ExplainabilityData,
@@ -66,7 +134,7 @@ def predict_single(request):
     """
     POST /api/predict/single/
     
-    Upload a FITS file and get exoplanet classification prediction.
+    Upload a FITS file OR provide a KepID to get exoplanet classification prediction.
     Optionally include KOI parameters for better accuracy.
     """
     serializer = PredictionRequestSerializer(data=request.data)
@@ -74,29 +142,78 @@ def predict_single(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     data = serializer.validated_data
-    fits_file = data['fits_file']
+    temp_path = None  # Initialize temp_path
     
-    # Save uploaded file temporarily
-    temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}.fits")
-    with open(temp_path, 'wb+') as destination:
-        for chunk in fits_file.chunks():
-            destination.write(chunk)
+    # Determine if using uploaded file or download via lightkurve
+    if data.get('fits_file'):
+        fits_file = data['fits_file']
+        use_lightkurve = False
+        kepid_param = data.get('kepid')
+    elif data.get('kepid'):
+        # Download FITS via fast cached method
+        kepid_param = data['kepid']
+        use_lightkurve = True
+        
+        try:
+            fits_path_to_use = fast_download_lightcurve(kepid_param)
+            
+            print(f"Successfully downloaded and saved light curve for KepID {kepid_param}")
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to download light curve via lightkurve: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    else:
+        return Response(
+            {'error': 'Either fits_file or kepid must be provided'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Save uploaded file temporarily (if uploaded)
+    if not use_lightkurve:
+        temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}.fits")
+        with open(temp_path, 'wb+') as destination:
+            for chunk in fits_file.chunks():
+                destination.write(chunk)
+        fits_path_to_use = temp_path
     
     try:
         # Extract metadata
-        metadata = extract_light_curve_metadata(temp_path)
+        metadata = extract_light_curve_metadata(fits_path_to_use)
+        
+        # Ensure all required fields have default values
+        kepid = kepid_param or metadata.get('kepid')
+        flux_points = metadata.get('flux_points') or 0
+        duration_days = metadata.get('duration_days')
+        data_quality_score = metadata.get('data_quality_score') or 0.0
+        gaps_detected = metadata.get('gaps_detected') or 0
+        flux_type = metadata.get('flux_type') or 'PDCSAP_FLUX'
         
         # Save to database
-        lc_file = LightCurveFile.objects.create(
-            file=fits_file,
-            kepid=data.get('kepid') or metadata.get('kepid'),
-            flux_points=metadata.get('flux_points'),
-            duration_days=metadata.get('duration_days'),
-            data_quality_score=metadata.get('data_quality_score'),
-            gaps_detected=metadata.get('gaps_detected'),
-            flux_type=metadata.get('flux_type'),
-            uploaded_by=request.user if request.user.is_authenticated else None
-        )
+        if use_lightkurve:
+            # For lightkurve downloads, create a reference but don't duplicate
+            lc_file = LightCurveFile.objects.create(
+                file=None,  # Don't duplicate file
+                kepid=kepid,
+                flux_points=flux_points,
+                duration_days=duration_days,
+                data_quality_score=data_quality_score,
+                gaps_detected=gaps_detected,
+                flux_type=flux_type,
+                uploaded_by=request.user if request.user.is_authenticated else None
+            )
+        else:
+            lc_file = LightCurveFile.objects.create(
+                file=fits_file,
+                kepid=kepid,
+                flux_points=flux_points,
+                duration_days=duration_days,
+                data_quality_score=data_quality_score,
+                gaps_detected=gaps_detected,
+                flux_type=flux_type,
+                uploaded_by=request.user if request.user.is_authenticated else None
+            )
         
         # Prepare KOI parameters
         koi_params = {}
@@ -104,7 +221,8 @@ def predict_single(request):
             'koi_period', 'koi_duration', 'koi_depth', 'koi_prad', 'koi_ror',
             'koi_model_snr', 'koi_num_transits', 'koi_steff', 'koi_slogg',
             'koi_srad', 'koi_smass', 'koi_kepmag', 'koi_insol', 'koi_dor',
-            'koi_count', 'koi_score'
+            'koi_count'
+            # 'koi_score' REMOVED - data leakage (0.89 correlation with label)
         ]
         for field in koi_feature_fields:
             if field in data and data[field] is not None:
@@ -115,7 +233,7 @@ def predict_single(request):
         cache_dir = os.path.join(settings.BASE_DIR, '..', 'training', 'lc_cache_npy')
         
         result = predictor.predict(
-            temp_path,
+            fits_path_to_use,
             koi_params=koi_params,
             cache_dir=cache_dir
         )
@@ -170,13 +288,14 @@ def predict_single(request):
         return Response(response_data, status=status.HTTP_201_CREATED)
     
     except Exception as e:
+        import traceback
         return Response(
-            {'error': str(e)},
+            {'error': f'Prediction error: {str(e)}', 'traceback': traceback.format_exc()},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     finally:
-        # Clean up temp file
-        if os.path.exists(temp_path):
+        # Clean up temporary file only if we created one
+        if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
 
 
@@ -190,78 +309,149 @@ def visualize_lightcurve(request):
     GET/POST /api/lightcurve/visualize/
     
     Get interactive light curve visualization data.
-    Provide either prediction_id (GET param) or upload FITS file (POST).
+    Provide either prediction_id, kepid, or upload FITS file.
+    Uses lightkurve to download from MAST when needed.
     """
+    temp_path = None
+    
     if request.method == 'GET':
+        # GET method with prediction_id or kepid query param
         prediction_id = request.query_params.get('prediction_id')
-        if not prediction_id:
+        kepid_param = request.query_params.get('kepid')
+        
+        if prediction_id:
+            try:
+                prediction = Prediction.objects.get(id=prediction_id)
+                if prediction.light_curve.file:
+                    fits_path = prediction.light_curve.file.path
+                    title = f"KepID {prediction.light_curve.kepid} - {prediction.predicted_class_name}"
+                else:
+                    # Download using lightkurve
+                    kepid_param = prediction.light_curve.kepid
+                    title = f"KepID {kepid_param} - {prediction.predicted_class_name}"
+            except Prediction.DoesNotExist:
+                return Response(
+                    {'error': 'Prediction not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        elif kepid_param:
+            title = f"KepID {kepid_param}"
+        else:
             return Response(
-                {'error': 'prediction_id parameter required'},
+                {'error': 'prediction_id or kepid parameter required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        try:
-            prediction = Prediction.objects.get(id=prediction_id)
-            fits_path = prediction.light_curve.file.path
-            title = f"KepID {prediction.light_curve.kepid} - {prediction.predicted_class_name}"
-        except Prediction.DoesNotExist:
-            return Response(
-                {'error': 'Prediction not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-    else:  # POST
-        serializer = VisualizationRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        data = serializer.validated_data
-        
-        if data.get('prediction_id'):
+        # If kepid_param is set, download via fast cached method
+        if kepid_param:
             try:
-                prediction = Prediction.objects.get(id=data['prediction_id'])
-                fits_path = prediction.light_curve.file.path
+                fits_path = fast_download_lightcurve(kepid_param)
+                
+            except Exception as e:
+                return Response(
+                    {'error': f'Failed to download light curve: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+    
+    else:  # POST
+        # Check if kepid or fits_file provided
+        kepid_param = request.data.get('kepid')
+        fits_file = request.data.get('fits_file')
+        prediction_id = request.data.get('prediction_id')
+        
+        if prediction_id:
+            try:
+                prediction = Prediction.objects.get(id=prediction_id)
+                if prediction.light_curve.file:
+                    fits_path = prediction.light_curve.file.path
+                else:
+                    kepid_param = prediction.light_curve.kepid
                 title = f"KepID {prediction.light_curve.kepid}"
             except Prediction.DoesNotExist:
                 return Response(
                     {'error': 'Prediction not found'},
                     status=status.HTTP_404_NOT_FOUND
                 )
-        else:
-            # Save temp file
-            fits_file = data['fits_file']
+        
+        # Download via fast cached method if kepid provided
+        if kepid_param:
+            try:
+                fits_path = fast_download_lightcurve(kepid_param)
+                title = f"KepID {kepid_param}"
+                
+            except Exception as e:
+                return Response(
+                    {'error': f'Failed to download light curve: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        elif fits_file:
+            # Save uploaded temp file
             temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}.fits")
             with open(temp_path, 'wb+') as destination:
                 for chunk in fits_file.chunks():
                     destination.write(chunk)
             fits_path = temp_path
             title = "Uploaded Light Curve"
+        else:
+            return Response(
+                {'error': 'Either prediction_id, kepid, or fits_file must be provided'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     try:
-        plot_data = create_interactive_plot(fits_path, title=title)
+        import numpy as np
+        import base64
+        from .flux_utils import get_flux_from_lc, get_time_from_lc
         
-        # Detect anomalies for highlighting
-        anomalies = detect_anomalies(fits_path)
+        # Load light curve to extract metadata
+        lc = lk.read(fits_path)
+        
+        time = get_time_from_lc(lc)
+        flux = get_flux_from_lc(lc)
+        
+        # Remove NaNs
+        valid_mask = ~np.isnan(flux)
+        time_clean = time[valid_mask]
+        flux_clean = flux[valid_mask]
+        
+        # Create visualization PNG
+        plot_img_bytes = create_interactive_plot(fits_path, title=title)
+        
+        # Convert to base64 for JSON response
+        plot_img_base64 = base64.b64encode(plot_img_bytes).decode('utf-8')
+        
+        # Extract metadata
+        duration = float(time_clean.max() - time_clean.min()) if len(time_clean) > 0 else 0
         
         response_data = {
-            'plot_data': plot_data,
-            'anomalies': anomalies,
+            'plot_image': f'data:image/png;base64,{plot_img_base64}',
             'metadata': {
-                'total_points': len(plot_data['time']),
-                'anomalies_detected': len(anomalies)
+                'flux_points': len(time_clean),
+                'duration_days': duration,
+                'flux_mean': float(np.mean(flux_clean)),
+                'flux_std': float(np.std(flux_clean)),
+                'flux_median': float(np.median(flux_clean)),
+                'data_quality_score': float(1.0 - (np.sum(~valid_mask) / len(flux))),
+                'gaps_detected': int(np.sum(np.diff(time_clean) > np.median(np.diff(time_clean)) * 3)),
+                'flux_type': 'PDCSAP' if hasattr(lc, 'pdcsap_flux') or 'pdcsap_flux' in [c.lower() for c in lc.colnames] else 'SAP'
             }
         }
+        
+        # Add kepid if available
+        if kepid_param:
+            response_data['kepid'] = int(kepid_param)
         
         return Response(response_data, status=status.HTTP_200_OK)
     
     except Exception as e:
+        import traceback
         return Response(
-            {'error': str(e)},
+            {'error': f'Visualization error: {str(e)}', 'traceback': traceback.format_exc()},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     finally:
-        if request.method == 'POST' and not data.get('prediction_id'):
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 @api_view(['POST'])
@@ -443,7 +633,7 @@ def recent_predictions(request):
     limit = int(request.query_params.get('limit', 50))
     offset = int(request.query_params.get('offset', 0))
     
-    predictions = Prediction.objects.all()[offset:offset+limit]
+    predictions = Prediction.objects.all().order_by('-created_at')[offset:offset+limit]
     serializer = PredictionSerializer(predictions, many=True)
     
     return Response({
@@ -491,6 +681,210 @@ class AnalysisSessionViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['get'])
     def predictions(self, request, pk=None):
+        """Get all predictions in this session"""
+        session = self.get_object()
+        predictions = session.predictions.all()
+        serializer = PredictionSerializer(predictions, many=True)
+        return Response(serializer.data)
+
+
+# ============================================================================
+# HELPER ENDPOINTS - KepID Search & Examples
+# ============================================================================
+
+@api_view(['GET'])
+def search_by_kepid(request):
+    """
+    GET /api/search-kepid/?kepid=10797460
+    
+    Search for KOI parameters by KepID.
+    Returns KOI parameters. FITS file will be downloaded via lightkurve when needed.
+    """
+    kepid = request.query_params.get('kepid')
+    if not kepid:
+        return Response(
+            {'error': 'kepid parameter is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        kepid = int(kepid)
+    except ValueError:
+        return Response(
+            {'error': 'kepid must be an integer'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Load KOI data
+    koi_csv_path = os.path.join(settings.BASE_DIR, '..', 'dataset', 'koi.csv')
+    if not os.path.exists(koi_csv_path):
+        return Response(
+            {'error': 'KOI dataset not found'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+    try:
+        df = pd.read_csv(koi_csv_path)
+        koi_data = df[df['kepid'] == kepid]
+        
+        if koi_data.empty:
+            return Response(
+                {'error': f'No KOI data found for KepID {kepid}'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get first matching row
+        row = koi_data.iloc[0]
+        
+        # Helper function to safely get string values (handle NaN)
+        def safe_str(value):
+            if pd.isna(value):
+                return None
+            return str(value) if value != '' else None
+        
+        # Extract parameters
+        params = {
+            'kepid': int(kepid),
+            'koi_period': float(row['koi_period']) if pd.notna(row.get('koi_period')) else None,
+            'koi_duration': float(row['koi_duration']) if pd.notna(row.get('koi_duration')) else None,
+            'koi_depth': float(row['koi_depth']) if pd.notna(row.get('koi_depth')) else None,
+            'koi_prad': float(row['koi_prad']) if pd.notna(row.get('koi_prad')) else None,
+            'koi_ror': float(row['koi_ror']) if pd.notna(row.get('koi_ror')) else None,
+            'koi_model_snr': float(row['koi_model_snr']) if pd.notna(row.get('koi_model_snr')) else None,
+            'koi_num_transits': int(row['koi_num_transits']) if pd.notna(row.get('koi_num_transits')) else None,
+            'koi_steff': float(row['koi_steff']) if pd.notna(row.get('koi_steff')) else None,
+            'koi_slogg': float(row['koi_slogg']) if pd.notna(row.get('koi_slogg')) else None,
+            'koi_srad': float(row['koi_srad']) if pd.notna(row.get('koi_srad')) else None,
+            'koi_smass': float(row['koi_smass']) if pd.notna(row.get('koi_smass')) else None,
+            'koi_kepmag': float(row['koi_kepmag']) if pd.notna(row.get('koi_kepmag')) else None,
+            'koi_insol': float(row['koi_insol']) if pd.notna(row.get('koi_insol')) else None,
+            'koi_dor': float(row['koi_dor']) if pd.notna(row.get('koi_dor')) else None,
+            'koi_count': int(row['koi_count']) if pd.notna(row.get('koi_count')) else None,
+            # 'koi_score' REMOVED - data leakage (0.89 correlation with label)
+            'koi_disposition': safe_str(row.get('koi_disposition')),
+            'kepler_name': safe_str(row.get('kepler_name')),
+        }
+        
+        return Response({
+            'success': True,
+            'kepid': kepid,
+            'parameters': params,
+            'fits_source': 'lightkurve',  # Will be downloaded via lightkurve
+            'message': f'Found data for KepID {kepid}. FITS file will be downloaded from MAST archive.'
+        })
+    
+    except Exception as e:
+        return Response(
+            {'error': f'Error searching KOI data: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# Curated list of examples with local FITS files
+# Mix of CONFIRMED, CANDIDATE, and FALSE POSITIVE for hackathon demos
+EXAMPLE_KEPIDS = [
+    10797460,  # CONFIRMED - Kepler-444 (period ~9.48 days)
+    10854555,  # CONFIRMED (period ~2.52 days)
+    10872983,  # CONFIRMED (period ~11.09 days)
+    10811496,  # CANDIDATE (period ~19.89 days)
+    11818800,  # CANDIDATE (period ~40.41 days)
+    11918099,  # CANDIDATE (period ~7.24 days)
+    10848459,  # FALSE POSITIVE (period ~1.73 days)
+    6721123,   # FALSE POSITIVE (period ~7.36 days)
+    10419211,  # FALSE POSITIVE (period ~11.52 days)
+]
+
+
+@api_view(['GET'])
+def get_example_data(request):
+    """
+    GET /api/get-example/
+    
+    Get a random example from curated list with local FITS files.
+    Uses pre-selected KepIDs with good mix of classifications for instant loading.
+    """
+    import random
+    
+    koi_csv_path = os.path.join(settings.BASE_DIR, '..', 'dataset', 'koi.csv')
+    # First check exodetect/example_lightcurves (for deployment), then fallback to parent lightcurves
+    example_lightcurves_dir = os.path.join(settings.BASE_DIR, 'example_lightcurves')
+    lightcurves_dir = os.path.join(settings.BASE_DIR, '..', 'lightcurves')
+    
+    if not os.path.exists(koi_csv_path):
+        return Response(
+            {'error': 'KOI dataset not found'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+    try:
+        # Randomly select from curated examples
+        kepid = random.choice(EXAMPLE_KEPIDS)
+        
+        # Check if local FITS file exists (prioritize example_lightcurves for deployment)
+        local_fits = os.path.join(example_lightcurves_dir, f'{kepid}.fits')
+        if not os.path.exists(local_fits):
+            # Fallback to parent lightcurves directory
+            local_fits = os.path.join(lightcurves_dir, f'{kepid}.fits')
+        fits_available = os.path.exists(local_fits)
+        
+        # Load parameters from koi.csv
+        df = pd.read_csv(koi_csv_path)
+        example = df[df['kepid'] == kepid]
+        
+        if example.empty:
+            return Response(
+                {'error': f'KepID {kepid} not found in dataset'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        example = example.iloc[0]
+        
+        # Helper function to safely get string values (handle NaN)
+        def safe_str(value):
+            if pd.isna(value):
+                return None
+            return str(value) if value != '' else None
+        
+        params = {
+            'kepid': kepid,
+            'koi_period': float(example['koi_period']) if pd.notna(example.get('koi_period')) else None,
+            'koi_duration': float(example['koi_duration']) if pd.notna(example.get('koi_duration')) else None,
+            'koi_depth': float(example['koi_depth']) if pd.notna(example.get('koi_depth')) else None,
+            'koi_prad': float(example['koi_prad']) if pd.notna(example.get('koi_prad')) else None,
+            'koi_ror': float(example['koi_ror']) if pd.notna(example.get('koi_ror')) else None,
+            'koi_model_snr': float(example['koi_model_snr']) if pd.notna(example.get('koi_model_snr')) else None,
+            'koi_num_transits': int(example['koi_num_transits']) if pd.notna(example.get('koi_num_transits')) else None,
+            'koi_steff': float(example['koi_steff']) if pd.notna(example.get('koi_steff')) else None,
+            'koi_slogg': float(example['koi_slogg']) if pd.notna(example.get('koi_slogg')) else None,
+            'koi_srad': float(example['koi_srad']) if pd.notna(example.get('koi_srad')) else None,
+            'koi_smass': float(example['koi_smass']) if pd.notna(example.get('koi_smass')) else None,
+            'koi_kepmag': float(example['koi_kepmag']) if pd.notna(example.get('koi_kepmag')) else None,
+            'koi_insol': float(example['koi_insol']) if pd.notna(example.get('koi_insol')) else None,
+            'koi_dor': float(example['koi_dor']) if pd.notna(example.get('koi_dor')) else None,
+            'koi_count': int(example['koi_count']) if pd.notna(example.get('koi_count')) else None,
+            # 'koi_score' REMOVED - data leakage (0.89 correlation with label)
+            'koi_disposition': safe_str(example.get('koi_disposition')),
+            'kepler_name': safe_str(example.get('kepler_name')),
+        }
+        
+        # Get display name for message
+        kepler_name = safe_str(example.get('kepler_name'))
+        display_name = kepler_name if kepler_name else f"KepID {kepid}"
+        disposition = safe_str(example.get('koi_disposition')) or 'UNKNOWN'
+        
+        return Response({
+            'success': True,
+            'kepid': kepid,
+            'parameters': params,
+            'fits_source': 'local' if fits_available else 'lightkurve',
+            'message': f'Example: {display_name} ({disposition}). {"Instant loading from local FITS!" if fits_available else "FITS will be downloaded from MAST."}'
+        })
+    
+    except Exception as e:
+        return Response(
+            {'error': f'Error getting example: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
         """Get all predictions in a session"""
         session = self.get_object()
         predictions = session.predictions.all()

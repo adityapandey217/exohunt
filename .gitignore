@@ -2,3 +2,8 @@ lightcurves/
 training/lc_cache_npy/
 training/features_cache_fits_only/
 training/lc_cache_fits_only
+
+# Keep example_lightcurves directory (deployment-ready curated files)
+!exodetect/example_lightcurves/
+!exodetect/example_lightcurves/*.fits
+node_modules/

@@ -61,4 +61,16 @@ export const submitFeedback = async (predictionId, correctedDisposition, confide
   return response.data;
 };
 
+export const searchByKepID = async (kepid) => {
+  const response = await api.get('/search-kepid/', {
+    params: { kepid },
+  });
+  return response.data;
+};
+
+export const getExampleData = async () => {
+  const response = await api.get('/get-example/');
+  return response.data;
+};
+
 export default api;

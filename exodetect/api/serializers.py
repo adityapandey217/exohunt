@@ -131,7 +131,7 @@ class ModelMetricsSerializer(serializers.ModelSerializer):
 
 class PredictionRequestSerializer(serializers.Serializer):
     """Serializer for prediction requests"""
-    fits_file = serializers.FileField(required=True)
+    fits_file = serializers.FileField(required=False, allow_null=True)
     kepid = serializers.IntegerField(required=False, allow_null=True)
     
     # Optional KOI parameters
@@ -153,6 +153,13 @@ class PredictionRequestSerializer(serializers.Serializer):
     koi_score = serializers.FloatField(required=False, allow_null=True)
     
     session_id = serializers.UUIDField(required=False, allow_null=True)
+    
+    def validate(self, data):
+        if not data.get('fits_file') and not data.get('kepid'):
+            raise serializers.ValidationError(
+                "Either fits_file or kepid must be provided"
+            )
+        return data
 
 
 class VisualizationRequestSerializer(serializers.Serializer):
