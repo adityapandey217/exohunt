@@ -1,2 +1,4 @@
 lightcurves/
 training/lc_cache_npy/
+training/features_cache_fits_only/
+training/lc_cache_fits_only
