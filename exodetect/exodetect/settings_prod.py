@@ -13,16 +13,18 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-produc
 # Allowed Hosts
 ALLOWED_HOSTS = [
     '.herokuapp.com',
+    'exohuntappfirebase.web.app',
+    'exohunt.biz',
+    'www.exohunt.biz',
     'localhost',
     '127.0.0.1',
 ]
 
-# Get frontend URL from environment
-FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
-
-# CORS Settings for production
+# CORS Settings for production - Allow frontend URLs
 CORS_ALLOWED_ORIGINS = [
-    FRONTEND_URL,
+    'https://exohuntappfirebase.web.app',
+    'https://exohunt.biz',
+    'https://www.exohunt.biz',
     'http://localhost:5173',
     'http://127.0.0.1:5173',
 ]
