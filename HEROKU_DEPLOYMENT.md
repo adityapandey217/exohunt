@@ -38,7 +38,12 @@ python -c 'from django.core.management.utils import get_random_secret_key; print
 heroku config:set SECRET_KEY='your-generated-secret-key'
 heroku config:set DJANGO_SETTINGS_MODULE=exodetect.settings_prod
 heroku config:set DEBUG=False
-heroku config:set FRONTEND_URL=https://your-frontend-url.web.app
+
+# Note: Frontend URLs are hardcoded in settings_prod.py:
+# - https://exohuntappfirebase.web.app
+# - https://exohunt.biz
+# - https://www.exohunt.biz
+# No need to set FRONTEND_URL environment variable
 
 # Optional: Set Python version
 heroku config:set PYTHON_RUNTIME_VERSION=3.13.1
