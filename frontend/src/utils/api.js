@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api'; // Update with your backend URL
+const API_BASE_URL = 'https://exohunt-backend-093e37f48816.herokuapp.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
