@@ -414,17 +414,14 @@ def visualize_lightcurve(request):
         time_clean = time[valid_mask]
         flux_clean = flux[valid_mask]
         
-        # Create visualization PNG
-        plot_img_bytes = create_interactive_plot(fits_path, title=title)
-        
-        # Convert to base64 for JSON response
-        plot_img_base64 = base64.b64encode(plot_img_bytes).decode('utf-8')
+        # Create visualization as plotly JSON (no kaleido needed)
+        plot_json = create_interactive_plot(fits_path, title=title)
         
         # Extract metadata
         duration = float(time_clean.max() - time_clean.min()) if len(time_clean) > 0 else 0
         
         response_data = {
-            'plot_image': f'data:image/png;base64,{plot_img_base64}',
+            'plot_json': plot_json,  # Plotly JSON format
             'metadata': {
                 'flux_points': len(time_clean),
                 'duration_days': duration,

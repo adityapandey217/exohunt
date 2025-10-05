@@ -3,6 +3,7 @@ import { FiUpload, FiLoader, FiSearch, FiZap } from 'react-icons/fi';
 import { searchByKepID, getExampleData } from '../utils/api';
 import { Alert } from 'flowbite-react';
 import axios from 'axios';
+import PlotlyChart from '../components/PlotlyChart';
 
 function Visualize() {
   const [file, setFile] = useState(null);
@@ -275,13 +276,11 @@ function Visualize() {
                   Light Curve Visualization
                 </h3>
                 
-                {/* PNG Image Plot */}
-                {plotData.plot_image && (
-                  <img 
-                    src={plotData.plot_image} 
-                    alt="Light Curve" 
-                    className="w-full mb-6 rounded-lg shadow-md"
-                  />
+                {/* Plotly Interactive Chart */}
+                {plotData.plot_json && (
+                  <div className="mb-6">
+                    <PlotlyChart plotJson={plotData.plot_json} />
+                  </div>
                 )}
 
                 {/* Metadata */}

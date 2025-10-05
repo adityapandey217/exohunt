@@ -103,9 +103,8 @@ def create_interactive_plot(
         margin=dict(l=60, r=30, t=60, b=60)
     )
     
-    # Return as PNG image bytes
-    img_bytes = fig.to_image(format='png', width=1200, height=500, scale=2)
-    return img_bytes
+    # Return plotly figure as JSON (better for web, no kaleido needed)
+    return fig.to_json()
 
 
 def detect_transits(
