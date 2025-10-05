@@ -39,7 +39,7 @@ function Visualize() {
       const result = await searchByKepID(kepidSearch);
       
       // Now visualize directly using lightkurve via GET
-      const response = await axios.get('http://localhost:8000/api/lightcurve/visualize/', {
+      const response = await axios.get('https://exohunt-backend-093e37f48816.herokuapp.com/api/lightcurve/visualize/', {
         params: { kepid: kepidSearch }
       });
       
