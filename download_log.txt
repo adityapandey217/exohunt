@@ -1,0 +1,40 @@
+2025-10-05 11:46:56,553 - INFO - Loading KepIDs from dataset/koi.csv
+2025-10-05 11:46:56,656 - INFO - Limited to first 25 KepIDs
+2025-10-05 11:46:56,656 - INFO - Found 25 unique KepIDs to process
+2025-10-05 11:46:56,657 - INFO - Starting download of 25 light curves using 10 workers
+2025-10-05 11:46:59,893 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:00,160 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:00,322 - INFO - 0% (120/44100) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:00,535 - INFO - 3% (119/4194) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:00,673 - INFO - 3% (119/4194) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:00,796 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:01,123 - INFO - 0% (180/42000) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:01,360 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:01,446 - INFO - 3% (1453/44550) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:01,628 - INFO - 3% (1453/44550) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:03,731 - INFO - 3% (1453/44550) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:03,955 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:04,165 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:04,352 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:04,684 - INFO - 3% (119/4194) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:04,816 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:05,179 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:05,179 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:05,571 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:05,719 - INFO - 3% (1453/44550) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:06,809 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:06,969 - INFO - 3% (119/4194) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:07,150 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:07,483 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:07,609 - INFO - 1% (13/1639) of the cadences will be ignored due to the quality mask (quality_bitmask=1130799).
+2025-10-05 11:47:07,672 - INFO - 
+============================================================
+2025-10-05 11:47:07,672 - INFO - DOWNLOAD SUMMARY
+2025-10-05 11:47:07,672 - INFO - ============================================================
+2025-10-05 11:47:07,672 - INFO - Total processed:  25
+2025-10-05 11:47:07,672 - INFO - Successfully downloaded: 25
+2025-10-05 11:47:07,672 - INFO - Skipped (existing):      0
+2025-10-05 11:47:07,672 - INFO - Failed:                  0
+2025-10-05 11:47:07,672 - INFO - Time elapsed:            11.02 seconds
+2025-10-05 11:47:07,672 - INFO - Average rate:            2.27 files/sec
+2025-10-05 11:47:07,672 - INFO - ============================================================
