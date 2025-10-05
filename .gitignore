@@ -7,3 +7,4 @@ training/lc_cache_fits_only
 !exodetect/example_lightcurves/
 !exodetect/example_lightcurves/*.fits
 node_modules/
+lightcurves_cache/

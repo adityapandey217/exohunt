@@ -8,27 +8,22 @@ An intelligent web application for detecting exoplanets from Kepler and TESS lig
 
 ExoHunt uses advanced machine learning to analyze stellar brightness measurements (light curves) and classify potential exoplanet transits. The system combines:
 
-- **Deep Learning**: Hybrid CNN+MLP architecture trained on thousands of Kepler light curves
-- **Transit Analysis**: BLS period search, phase-folding, and periodogram analysis
-- **Interactive Visualization**: Real-time light curve exploration with Plotly
-- **Research Tools**: Active learning, batch processing, and explainability features
+- **Hybrid Deep Learning**: CNN (time-series) + MLP (tabular features) fusion architecture
+- **NASA MAST Integration**: Direct access to Kepler mission data via lightkurve
+- **Real-Time Predictions**: Fast inference with confidence scores and visualizations
+- **Interactive UI**: Modern React interface with live light curve visualization
 
 ## 🏆 Features
 
 ### Core Capabilities
-✅ **AI Classification**: 3-class prediction (Confirmed/Candidate/False Positive) with 95%+ accuracy  
-✅ **FITS File Processing**: Native support for Kepler and TESS data formats  
-✅ **Transit Detection**: Automated BLS algorithm with SNR thresholding  
-✅ **Phase-Folding**: Orbital period analysis and visualization  
-✅ **Interactive Plots**: Zoom, pan, and explore light curves  
+✅ **AI Classification**: 3-class prediction (Confirmed/Candidate/False Positive) with 67.5% validation accuracy  
+✅ **15 Input Features**: Orbital period, planet radius, stellar properties, and more  
+✅ **FITS File Processing**: Native support for Kepler light curves from MAST archive  
+✅ **KepID Search**: Instant parameter lookup from 9,566 Kepler Objects of Interest  
+✅ **Random Examples**: Curated demo files with balanced class distribution  
+✅ **PNG Visualizations**: Server-side rendering with Plotly for 95% smaller payload  
+✅ **Smart Caching**: 24-hour FITS cache for 99.9% faster repeat requests  
 ✅ **Dashboard**: Real-time statistics and prediction history  
-
-### Advanced Features
-🔬 **Periodogram Analysis**: Lomb-Scargle frequency detection  
-🔍 **Anomaly Detection**: Sigma-clipping outlier identification  
-📊 **Batch Processing**: Async processing for multiple light curves  
-🎓 **Active Learning**: Expert feedback integration for model improvement  
-💡 **Explainability**: Grad-CAM and SHAP value visualization  
 
 ## 🛠️ Tech Stack
 
@@ -236,34 +231,39 @@ See [API_QUICK_TEST.md](API_QUICK_TEST.md) for more examples.
 
 ## 🤖 Model Architecture
 
-### Hybrid CNN+MLP (HybridExoNet)
+### HybridExoNet: CNN+MLP Fusion
 
-**Input**:
-- Light curve: 2000 flux measurements (1D CNN)
-- Tabular features: 16 KOI parameters (MLP)
+Our model combines temporal pattern recognition with physical parameter analysis:
 
-**CNN Branch**:
-```
-Conv1D(64) → ReLU → MaxPool
-Conv1D(128) → ReLU → MaxPool
-Conv1D(256) → ReLU → Flatten
-```
+**Architecture**:
+- **CNN Branch**: Processes 2,000 flux measurements to detect transit patterns
+  - 3 Conv1D layers (32→64→128 filters) with ReLU and MaxPooling
+  - Extracts temporal features from light curve time-series
+- **MLP Branch**: Analyzes 15 stellar/orbital parameters
+  - 2 fully-connected layers (64→32 neurons)
+  - Validates planetary characteristics
+- **Fusion Head**: Combines both branches
+  - Concatenates CNN + MLP outputs → 64 neurons → 3-class softmax
 
-**MLP Branch**:
-```
-Linear(128) → ReLU → Dropout(0.3)
-Linear(64) → ReLU
-```
+**Performance** (Validation on 1,902 KOIs):
+- **Overall Accuracy**: 67.5%
+- **Weighted F1 Score**: 63.0%
 
-**Fusion**:
-```
-Concat(CNN + MLP) → Linear(128) → ReLU → Dropout(0.5)
-Linear(3) → Softmax
-```
+| Class          | Precision | Recall | F1-Score | Support |
+|----------------|-----------|--------|----------|---------|
+| FALSE POSITIVE | 0.74      | 0.86   | 0.79     | 981     |
+| CANDIDATE      | 0.44      | 0.11   | 0.17     | 395     |
+| CONFIRMED      | 0.60      | 0.75   | 0.67     | 526     |
 
-**Output**: 3-class probabilities (FALSE POSITIVE, CANDIDATE, CONFIRMED)
+**Strengths**: Excellent at identifying false positives (79% F1), strong recall on confirmed planets (75%)  
+**Challenges**: Candidate class detection (most ambiguous signals)
 
-Training details: [training/train.ipynb](training/train.ipynb)
+**Input Features (15 total)**:
+- **Orbital**: Period, duration, depth, transit count, duration-to-orbital ratio
+- **Planetary**: Radius, radius ratio, insolation flux, signal-to-noise ratio
+- **Stellar**: Temperature, surface gravity, radius, mass, magnitude, KOI count
+
+Training notebook: [training/train.ipynb](training/train.ipynb)
 
 ## 📊 Dataset
 
