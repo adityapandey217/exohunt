@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-Optimized parallel downloader for Kepler light curves.
-Uses concurrent downloads, caching, and progress tracking for maximum performance.
-"""
 
 import lightkurve as lk
 import pandas as pd
@@ -127,19 +122,6 @@ def download_lc(kic, output_dir, skip_existing=True):
 
 
 def download_batch(kepids, output_dir='lightcurves', max_workers=10, skip_existing=True):
-    """
-    Download light curves in parallel with progress tracking.
-    Uses ProcessPoolExecutor for better isolation and thread-safety.
-    
-    Args:
-        kepids: List of Kepler IDs to download
-        output_dir: Directory to save files
-        max_workers: Number of parallel download processes
-        skip_existing: Skip already downloaded files
-    
-    Returns:
-        Dictionary with download statistics
-    """
     # Create output directory if it doesn't exist
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     
