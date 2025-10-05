@@ -173,38 +173,38 @@ Full API documentation: [API_FEATURES.md](API_FEATURES.md)
 
 ### 1. Upload a Light Curve
 
+**Option A: Search by KepID**
 1. Navigate to the **Analyze** page
-2. Click "Upload" or drag-and-drop a FITS file
-3. (Optional) Enter KOI parameters for improved accuracy:
-   - Period (days)
-   - Depth (ppm)
-   - Duration (hours)
-   - Planet radius (Earth radii)
+2. Enter a Kepler ID (e.g., `10797460`)
+3. Click "Search" - parameters auto-populate from dataset
 4. Click "Predict Exoplanet"
+
+**Option B: Random Example**
+1. Click "Load Random Example" button
+2. Curated example loads instantly (local FITS files)
+3. Parameters auto-filled from dataset
+4. Click "Predict Exoplanet"
+
+**Option C: Manual Entry**
+1. Enter all 15 KOI parameters manually
+2. System will download FITS from NASA MAST archive
+3. Click "Predict Exoplanet"
 
 ### 2. View Results
 
 - **Disposition**: Confirmed / Candidate / False Positive
 - **Confidence**: Probability score (0-100%)
 - **Class Probabilities**: Breakdown for all 3 classes
-- **Metadata**: KIC ID, duration, data points, quality score
+- **Light Curve Plot**: Interactive PNG visualization with transit markers
+- **Processing Time**: Inference and download metrics
 
-### 3. Advanced Analysis
-
-Click "Advanced Analysis & Visualization" to access:
-- Interactive light curve plot
-- Transit detection results
-- Phase-folded light curve
-- Periodogram analysis
-
-### 4. Dashboard Overview
+### 3. Dashboard Overview
 
 View overall statistics:
-- Total predictions
-- Confirmed exoplanets count
-- Candidate count
-- False positive count
-- Recent predictions table
+- Total predictions made
+- Class distribution (Confirmed / Candidate / False Positive)
+- Recent predictions table with confidence scores
+- Model performance metrics and architecture explanation
 
 ## 🧪 Testing
 
@@ -268,17 +268,19 @@ Training notebook: [training/train.ipynb](training/train.ipynb)
 ## 📊 Dataset
 
 - **Source**: NASA Exoplanet Archive (Kepler KOI catalog)
-- **Size**: ~9,000 KOIs
-- **Features**: 16 tabular parameters + 2000-point light curves
+- **Size**: 9,566 Kepler Objects of Interest
+- **Features**: 15 tabular parameters + 2,000-point light curves (PDCSAP flux)
 - **Classes**: 
-  - FALSE POSITIVE: 6,000+
-  - CANDIDATE: 2,000+
-  - CONFIRMED: 1,000+
+  - FALSE POSITIVE: ~52% (not planetary signals)
+  - CANDIDATE: ~21% (potential exoplanets, unconfirmed)
+  - CONFIRMED: ~27% (validated exoplanets)
 
-Files:
-- `dataset/koi.csv` - KOI catalog with parameters
-- `dataset/koi_annotations.csv` - Ground truth labels
-- `lightcurves/*.fits` - FITS light curve files
+**Data Sources**:
+- `dataset/koi.csv` - KOI catalog with stellar/orbital parameters (130+ columns)
+- `lightcurves/*.fits` - Kepler light curve FITS files (downloaded from MAST)
+- `exodetect/example_lightcurves/` - 9 curated examples (2.6 MB, deployment-ready)
+
+**Data Integrity**: Model trained WITHOUT data leakage - removed `koi_pdisposition` and `koi_score` to ensure genuine physical pattern learning.
 
 ## 🔧 Configuration
 
@@ -369,11 +371,13 @@ npm run build
 
 ### Key Achievements
 
-✨ **95%+ Accuracy** on test set  
-✨ **Sub-second Inference** for real-time predictions  
-✨ **Interactive Visualization** with Plotly  
-✨ **Production-Ready** API with comprehensive documentation  
-✨ **Modern UI** with React, Tailwind CSS, and Flowbite  
+✨ **67.5% Validation Accuracy** with 63% weighted F1 score  
+✨ **15 Physics-Based Features** - no data leakage, genuine pattern learning  
+✨ **Sub-Second Inference** for real-time predictions  
+✨ **Smart Caching** - 99.9% faster repeat requests with 24-hour FITS cache  
+✨ **NASA MAST Integration** - direct lightkurve downloads from archive  
+✨ **Modern UI** with React, Tailwind CSS, and interactive visualizations  
+✨ **9 Curated Examples** - instant loading with balanced class distribution  
 
 ## 🐛 Troubleshooting
 
