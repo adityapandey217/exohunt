@@ -68,7 +68,7 @@ function Visualize() {
         setKepidSearch(result.kepid.toString());
         
         // Visualize directly using lightkurve
-        const response = await axios.get('http://localhost:8000/api/lightcurve/visualize/', {
+        const response = await axios.get('https://exohunt-backend-093e37f48816.herokuapp.com/api/lightcurve/visualize/', {
           params: { kepid: result.kepid }
         });
         
@@ -98,7 +98,7 @@ function Visualize() {
     try {
       if (file.fromServer) {
         // Use GET with kepid parameter
-        const response = await axios.get('http://localhost:8000/api/lightcurve/visualize/', {
+        const response = await axios.get('https://exohunt-backend-093e37f48816.herokuapp.com/api/lightcurve/visualize/', {
           params: { kepid: file.kepid }
         });
         
@@ -111,7 +111,7 @@ function Visualize() {
         const formData = new FormData();
         formData.append('fits_file', file);
 
-        const response = await axios.post('http://localhost:8000/api/lightcurve/visualize/', formData, {
+        const response = await axios.post('https://exohunt-backend-093e37f48816.herokuapp.com/api/lightcurve/visualize/', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
