@@ -1,0 +1,27 @@
+# Core Django Framework
+Django==5.2.4
+djangorestframework==3.16.0
+django-cors-headers==4.7.0
+
+# Deep Learning & ML
+torch==2.7.1
+joblib==1.4.2
+
+# Astronomy & Data Processing
+lightkurve==2.5.1
+astropy==7.0.0
+astropy-iers-data==0.2025.1.13.0.34.51
+scipy==1.15.3
+numpy==2.1.3
+pandas==2.2.3
+
+# Visualization
+matplotlib==3.10.0
+matplotlib-inline==0.1.6
+
+# Image Processing
+Pillow>=10.0.0
+
+# Additional utilities (if needed)
+# requests>=2.31.0
+# python-dateutil>=2.8.2
